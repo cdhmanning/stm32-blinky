@@ -7,11 +7,14 @@ DUMP = arm-none-eabi-objdump
 MKDIR = mkdir -p
 RM = rm -f
 
-
-
 # Flags
-CFLAGS = -mcpu=cortex-m3 -mthumb -Wall -Werror -Iplib -Icore_lib
+CFLAGS = -mcpu=cortex-m3 -mthumb -Wall -Werror -Iplib -Icore_lib 
+CFLAGS += -DSTM32F10X_MD
 LFLAGS = -g -v -Tlinker_script.ld -nostartfiles -Wl,--cref -mthumb -mcpu=cortex-m3 $(LIBS)
+
+
+CFLAGS += -ffunction-sections -fdata-sections
+LFLAGS += -Wl,-gc-sections
 
 # Output files
 ELF = blinky
@@ -53,14 +56,13 @@ R_CFLAGS = -O2
 .PRECIOUS: $(D_TARGET) $(D_TARGET_HEX) $(D_OBJECTS) $(R_TARGET) $(R_TARGET_HEX) $(R_OBJECTS)
 
 # Default build
-all: prep release
+all: prep rebuildall
 
 debug: $(D_TARGET)
 
 $(D_TARGET): $(D_OBJECTS)
 	$(LL) $(LFLAGS) -Wl,-Map=$(D_TARGET).map -o $(D_TARGET) $^
-	$(OBJCOPY) -O ihex --gap-fill 0xFF --pad-to 0x8000 $(D_TARGET) $(D_TARGET_HEX)
-	$(OBJCOPY) -O binary --gap-fill 0xFF --pad-to 0x8000 $(D_TARGET) $(D_TARGET_BIN)
+	$(OBJCOPY) -O binary $(D_TARGET) $(D_TARGET_BIN)
 	$(DUMP) -S $(D_TARGET) > $(D_TARGET_LIST)
 
 $(D_OBJECT_DIR)/%.o: %.c
@@ -68,10 +70,12 @@ $(D_OBJECT_DIR)/%.o: %.c
 	mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $(D_CFLAGS) -o $@ $<
 
-$(D_OBJECT_DIR)/%.o: %S
+$(D_OBJECT_DIR)/%.o: %.S
 	echo Building $@
 	mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $(D_CFLAGS) -o $@ $<
+
+
 
 #
 # Release build rules
@@ -84,8 +88,7 @@ release: $(R_TARGET)
 
 $(R_TARGET): $(R_OBJECTS)
 	$(LL) $(LFLAGS) -Wl,-Map=$(R_TARGET).map -o $(R_TARGET) $^
-	$(OBJCOPY) -O ihex --gap-fill 0xFF --pad-to 0x8000 $(R_TARGET) $(R_TARGET_HEX)
-	$(OBJCOPY) -O binary --gap-fill 0xFF --pad-to 0x8000 $(R_TARGET) $(R_TARGET_BIN)
+	$(OBJCOPY) -O binary $(R_TARGET) $(R_TARGET_BIN)
 	$(DUMP) -S $(R_TARGET) > $(R_TARGET_LIST)
 
 $(R_OBJECT_DIR)/%.o: %.c

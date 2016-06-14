@@ -1,31 +1,81 @@
-/*
-* LED connected to PB0
-* do not forget current limiting resistor(!)
-*/
+#include "stm32f10x_gpio.h"
+#include "stm32f10x_rcc.h"
 
-#define STM32F10X_MD
-#include "stm32f10x.h"
+#define GPIO_BANK	GPIOC
+#define GPIO_PIN	GPIO_Pin_13
 
-// RAM starts at 0x20000000
-// Stack at 0x20001000 (4Kbyte stack)
-__asm__(".word 0x20001000");
-__asm__(".word main");
-
-int  main()
+/* timing is not guaranteed :) */
+void simple_delay(uint32_t us)
 {
-	unsigned int c = 0;
-
-	// enable port B clock
-	RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
-
-	// set up pin B0 as output (push-pull)
-	GPIOB->CRL &= 0xfffffff0;
-	GPIOB->CRL |= 0x00000001;
-
-	while(1) {
-		GPIOB->BSRR = (1 << 0); // ON
-		for(c = 0; c < 100000; c++);
-		GPIOB->BSRR = (1 << 16); // OFF
-		for(c = 0; c < 400000; c++);
+        us *= 10;
+        
+	/* simple delay loop */
+	while (us--) {
+		asm volatile ("nop");
 	}
+}
+
+
+
+void  SysTick_Handler(void)
+{
+    static uint32_t gpio_on;
+    static uint32_t flash_count;
+    
+    flash_count++;
+    
+    if (flash_count < 500)
+        return;
+        
+    flash_count = 0;
+    
+    if (gpio_on)
+        GPIO_SetBits(GPIO_BANK, GPIO_PIN);
+    else
+        GPIO_ResetBits(GPIO_BANK, GPIO_PIN);
+    gpio_on = !gpio_on;
+        
+}
+
+int main(void)
+{
+
+    GPIO_InitTypeDef gpio;
+ 
+    
+    SysTick_Config(72000000/1000);
+    
+    /* enable gpio clocks */
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
+ 
+    GPIO_StructInit(&gpio);
+    gpio.GPIO_Pin = (GPIO_PIN);
+    gpio.GPIO_Mode = GPIO_Mode_Out_PP;
+    gpio.GPIO_Speed =  GPIO_Speed_10MHz;
+    GPIO_Init(GPIO_BANK, &gpio);
+    
+    __enable_irq();
+ 
+ #if 0
+    /* main program loop */
+    for (;;) {
+        /* set led on */
+        GPIO_SetBits(GPIO_BANK, GPIO_PIN);
+        /* delay */
+        simple_delay(100000);
+        /* clear led */
+        GPIO_ResetBits(GPIO_BANK, GPIO_PIN);
+        /* delay */
+        simple_delay(100000);
+    }
+ 
+ #else
+     while(1) {
+         __WFI();
+    }
+ #endif
+ 
+    /* never reached */
+    return 0;
 }
